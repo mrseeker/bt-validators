@@ -14,7 +14,7 @@ score = 0
 model = AutoModelForCausalLM.from_pretrained("lmsys/vicuna-7b-v1.3").to("cuda")
 tokenizer = AutoTokenizer.from_pretrained("lmsys/vicuna-7b-v1.3")
 
-async def run_step(self, prompt: str, k: int, timeout: float, name: str, exclude: list = []):
+def run_step(self, prompt: str, k: int, timeout: float, name: str, exclude: list = []):
     global score
     bt.logging.debug("run_step", name)
 
@@ -91,7 +91,7 @@ def forward():
     aug_prompt = augment_prompt(base_text)
 
     # Request a summary, given the original context.
-    augment_event = await run_step(
+    augment_event = run_step(
         prompt=aug_prompt,
         name='augment',
         k=openvalidators.neuron.followup_sample_size,
@@ -104,7 +104,7 @@ def forward():
 
         # Get a followup question, given the summarized context.
         prompt = followup_prompt(base_text, i=k)
-        followup_event = await run_step(
+        followup_event = run_step(
             prompt=prompt,
             name='followup' + str(k),
             k=openvalidators.config.neuron.followup_sample_size,
@@ -115,7 +115,7 @@ def forward():
 
         # Ask the followup question, given the original context.
         prompt = answer_prompt(base_text, followup_event['best'])
-        answer_event = await run_step(
+        answer_event = run_step(
             prompt=prompt,
             name='answer' + str(k),
             k=openvalidators.config.neuron.answer_sample_size,
