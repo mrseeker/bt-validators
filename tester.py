@@ -12,7 +12,8 @@ from openvalidators.reward import OpenAssistantRewardModel, ReciprocateRewardMod
     DiversityRewardModel, PromptRewardModel
 from openvalidators.reward.config import DefaultRewardFrameworkConfig
 
-bt.logging.set_trace(True)
+bt.logging.set_trace(False)
+bt.logging.debug = False
 score = 0
 model = AutoModelForCausalLM.from_pretrained("EleutherAI/pythia-70m").to("cuda")
 tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m")
@@ -24,7 +25,7 @@ reward_weights = torch.tensor([
 reward_functions = [
                 OpenAssistantRewardModel(device="cuda"),
                 ReciprocateRewardModel(device="cuda"),
-                DahoasRewardModel(path=openvalidators.config.neuron.full_path, device="cuda"),
+                DahoasRewardModel(path="/root/dahoas", device="cuda"),
                 DiversityRewardModel(device="cuda"),
                 PromptRewardModel(device="cuda"),
             ]
