@@ -1,4 +1,4 @@
-from datetime import time
+import time
 from random import random
 from typing import List
 
@@ -8,11 +8,26 @@ import bittensor as bt
 from openvalidators.prompts import followup_prompt, answer_prompt, augment_prompt
 import openvalidators
 from openvalidators import dataset
+from openvalidators.reward import OpenAssistantRewardModel, ReciprocateRewardModel, DahoasRewardModel, \
+    DiversityRewardModel, PromptRewardModel
+from openvalidators.reward.config import DefaultRewardFrameworkConfig
 
 bt.logging.set_trace(True)
 score = 0
 model = AutoModelForCausalLM.from_pretrained("lmsys/vicuna-7b-v1.3").to("cuda")
-tokenizer = AutoTokenizer.from_pretrained("lmsys/vicuna-7b-v1.3")
+tokenizer = AutoTokenizer.from_pretrained("lmsys/vicuna-7b-v1.3").to("cuda")
+reward_weights = torch.tensor([
+                DefaultRewardFrameworkConfig.rlhf_model_weight, DefaultRewardFrameworkConfig.reciprocate_model_weight, DefaultRewardFrameworkConfig.dahoas_model_weight,
+                DefaultRewardFrameworkConfig.diversity_model_weight, DefaultRewardFrameworkConfig.prompt_model_weight
+            ], dtype=torch.float32).to("cuda")
+
+reward_functions = [
+                OpenAssistantRewardModel(device="cuda"),
+                ReciprocateRewardModel(device="cuda"),
+                DahoasRewardModel(path=openvalidators.config.neuron.full_path, device="cuda"),
+                DiversityRewardModel(device="cuda"),
+                PromptRewardModel(device="cuda"),
+            ]
 
 def run_step(self, prompt: str, k: int, timeout: float, name: str, exclude: list = []):
     global score
@@ -33,18 +48,18 @@ def run_step(self, prompt: str, k: int, timeout: float, name: str, exclude: list
     responses = [tokenizer.batch_decode(gen_tokens)[0]]
     uids = [0]
     # Compute the rewards for the responses given the prompt.
-    rewards: torch.FloatTensor = torch.zeros(len(responses), dtype=torch.float32).to(self.device)
-    for weight_i, reward_fn_i in zip(self.reward_weights, self.reward_functions):
-        reward_i = reward_fn_i.apply(prompt, responses, name).to(self.device)
+    rewards: torch.FloatTensor = torch.zeros(len(responses), dtype=torch.float32).to("cuda")
+    for weight_i, reward_fn_i in zip(openvalidators.reward_weights, openvalidators.reward_functions):
+        reward_i = reward_fn_i.apply(prompt, responses, name).to("cuda")
         rewards += weight_i * reward_i
-        if self.config.neuron.log_rewards:
+        if bt.config.neuron.log_rewards:
             event[reward_fn_i.name] = reward_i.tolist()
         bt.logging.trace(str(reward_fn_i.name), reward_i.tolist())
 
-    for masking_fn_i in self.masking_functions:
-        mask_i = masking_fn_i.apply(prompt, responses, name).to(self.device)
+    for masking_fn_i in openvalidators.masking_functions:
+        mask_i = masking_fn_i.apply(prompt, responses, name).to("cuda")
         rewards *= mask_i
-        if self.config.neuron.log_rewards:
+        if openvalidators.config.neuron.log_rewards:
             event[masking_fn_i.name] = mask_i.tolist()
         bt.logging.trace(str(masking_fn_i.name), mask_i.tolist())
 
@@ -55,15 +70,6 @@ def run_step(self, prompt: str, k: int, timeout: float, name: str, exclude: list
     # Get completion times
     completion_times: List[float] = [comp.elapsed_time for comp in responses]
 
-    # Compute forward pass rewards, assumes followup_uids and answer_uids are mutually exclusive.
-    # shape: [ metagraph.n ]
-    scattered_rewards: torch.FloatTensor = self.moving_averaged_scores.scatter(0, uids, rewards).to(self.device)
-
-    # Update moving_averaged_scores with rewards produced by this step.
-    # shape: [ metagraph.n ]
-    alpha: float = self.config.neuron.moving_average_alpha
-    self.moving_averaged_scores: torch.FloatTensor = alpha * scattered_rewards + (
-                1 - alpha) * self.moving_averaged_scores.to(self.device)
     score = score + rewards.argmax(dim=0)
     # Log the step event.
     event.update({
@@ -83,7 +89,8 @@ def run_step(self, prompt: str, k: int, timeout: float, name: str, exclude: list
 def forward():
     global score
     # Obtain a unique context from the dataset.
-    data = next(dataset)["text"]
+    datas = dataset.Dataset()
+    data = next(datas)["text"]
 
     random_cutoff = random.randint(15, 30)
     # Truncate context to a limited set of sentences.
