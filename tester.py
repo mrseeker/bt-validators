@@ -58,16 +58,16 @@ def run_step(prompt: str, name: str):
         if bt.config.neuron.log_rewards:
             event[reward_fn_i.name] = reward_i.tolist()
         bt.logging.trace(str(reward_fn_i.name), reward_i.tolist())
-
+    best = responses[0]
     score = score + rewards.argmax(dim=0)
     # Log the step event.
     event.update({
-        'uids': uids.tolist(),
-        'step_length': time.time() - start_time,
+#        'uids': uids.tolist(),
+#        'step_length': time.time() - start_time,
         'prompt': prompt,
-        'completions': completions,
-        'completion_times': completion_times,
-        'rewards': rewards.tolist(),
+#        'completions': completions,
+#        'completion_times': completion_times,
+#        'rewards': rewards.tolist(),
         'best': best
     })
     bt.logging.debug("event:", str(event))
