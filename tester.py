@@ -15,8 +15,8 @@ from openvalidators.reward.config import DefaultRewardFrameworkConfig
 bt.logging.set_trace(False)
 bt.logging.debug = False
 score = 0
-model = AutoModelForCausalLM.from_pretrained("EleutherAI/pythia-70m").to("cuda")
-tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m")
+model = AutoModelForCausalLM.from_pretrained("lmsys/vicuna-7b-v1.3").to("cuda")
+tokenizer = AutoTokenizer.from_pretrained("lmsys/vicuna-7b-v1.3")
 reward_weights = torch.tensor([
                 DefaultRewardFrameworkConfig.rlhf_model_weight, DefaultRewardFrameworkConfig.reciprocate_model_weight, DefaultRewardFrameworkConfig.dahoas_model_weight,
                 DefaultRewardFrameworkConfig.diversity_model_weight, DefaultRewardFrameworkConfig.prompt_model_weight
