@@ -25,10 +25,12 @@ reward_weights = torch.tensor([
 reward_functions = [
                 OpenAssistantRewardModel(device="cuda"),
                 ReciprocateRewardModel(device="cuda"),
-                DahoasRewardModel(path="/root/dahoas", device="cuda"),
-                DiversityRewardModel(device="cuda"),
-                PromptRewardModel(device="cuda"),
+ #               DahoasRewardModel(path="/root/dahoas", device="cuda"),
+ #               DiversityRewardModel(device="cuda"),
+ #               PromptRewardModel(device="cuda"),
             ]
+
+
 
 def run_step(prompt: str, name: str):
     global score
@@ -44,7 +46,7 @@ def run_step(prompt: str, name: str):
         input_ids,
         do_sample=True,
         temperature=0.9,
-        max_length=100,
+        max_length=len(input_ids[0]) + 100,
     )
     responses = [tokenizer.batch_decode(gen_tokens)[0]]
     uids = [0]
@@ -56,13 +58,6 @@ def run_step(prompt: str, name: str):
         if bt.config.neuron.log_rewards:
             event[reward_fn_i.name] = reward_i.tolist()
         bt.logging.trace(str(reward_fn_i.name), reward_i.tolist())
-
-    # Find the best completion given the rewards vector.
-    completions: List[str] = [comp.completion for comp in responses]
-    best: str = completions[rewards.argmax(dim=0)].strip()
-
-    # Get completion times
-    completion_times: List[float] = [comp.elapsed_time for comp in responses]
 
     score = score + rewards.argmax(dim=0)
     # Log the step event.
