@@ -50,19 +50,12 @@ def run_step(prompt: str, name: str):
     uids = [0]
     # Compute the rewards for the responses given the prompt.
     rewards: torch.FloatTensor = torch.zeros(len(responses), dtype=torch.float32).to("cuda")
-    for weight_i, reward_fn_i in zip(openvalidators.reward_weights, openvalidators.reward_functions):
+    for weight_i, reward_fn_i in zip(reward_weights, reward_functions):
         reward_i = reward_fn_i.apply(prompt, responses, name).to("cuda")
         rewards += weight_i * reward_i
         if bt.config.neuron.log_rewards:
             event[reward_fn_i.name] = reward_i.tolist()
         bt.logging.trace(str(reward_fn_i.name), reward_i.tolist())
-
-    for masking_fn_i in openvalidators.masking_functions:
-        mask_i = masking_fn_i.apply(prompt, responses, name).to("cuda")
-        rewards *= mask_i
-        if openvalidators.config.neuron.log_rewards:
-            event[masking_fn_i.name] = mask_i.tolist()
-        bt.logging.trace(str(masking_fn_i.name), mask_i.tolist())
 
     # Find the best completion given the rewards vector.
     completions: List[str] = [comp.completion for comp in responses]

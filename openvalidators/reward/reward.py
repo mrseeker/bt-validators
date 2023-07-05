@@ -88,7 +88,7 @@ class BaseRewardModel:
         """ Applies the reward model across each call. Unsuccessful responses are zeroed.
         """
         # Get indices of correctly responding calls.
-        successful_completions_indices: List[int] = [ idx for idx, resp in enumerate(responses) if resp.is_success ]
+        successful_completions_indices: List[int] = [ idx for idx, resp in enumerate(responses) ]
 
         # Get all completions from responding calls.
         successful_completions: List[str] = [ responses[idx].completion.strip() for idx in successful_completions_indices]
