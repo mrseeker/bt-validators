@@ -1,5 +1,5 @@
 import time
-from random import random
+import random
 from typing import List
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -30,7 +30,7 @@ reward_functions = [
                 PromptRewardModel(device="cuda"),
             ]
 
-def run_step(self, prompt: str, k: int, timeout: float, name: str, exclude: list = []):
+def run_step(prompt: str, name: str):
     global score
     bt.logging.debug("run_step", name)
 
@@ -92,7 +92,6 @@ def forward():
     # Obtain a unique context from the dataset.
     datas = dataset.Dataset()
     data = next(datas)["text"]
-
     random_cutoff = random.randint(15, 30)
     # Truncate context to a limited set of sentences.
     base_text = '.'.join(data.split('.', maxsplit=random_cutoff)[:-1])
@@ -102,22 +101,17 @@ def forward():
     augment_event = run_step(
         prompt=aug_prompt,
         name='augment',
-        k=openvalidators.neuron.followup_sample_size,
-        timeout=openvalidators.config.neuron.followup_timeout,
     )
 
     base_text = augment_event['best']
     exclude = augment_event['uids']
-    for k in range(openvalidators.neuron.num_followup_steps):
+    for k in range(4):
 
         # Get a followup question, given the summarized context.
         prompt = followup_prompt(base_text, i=k)
         followup_event = run_step(
             prompt=prompt,
             name='followup' + str(k),
-            k=openvalidators.config.neuron.followup_sample_size,
-            timeout=openvalidators.config.neuron.followup_timeout,
-            exclude=exclude
         )
         exclude += followup_event['uids']
 
@@ -126,14 +120,8 @@ def forward():
         answer_event = run_step(
             prompt=prompt,
             name='answer' + str(k),
-            k=openvalidators.config.neuron.answer_sample_size,
-            timeout=openvalidators.config.neuron.answer_timeout,
-            exclude=exclude
         )
         exclude += answer_event['uids']
-
-        openvalidators.blacklist.question_blacklist.append(followup_event['best'])
-        openvalidators.blacklist.answer_blacklist.append(answer_event['best'])
 
         if k == 0:
             # Extend the base text with the best answer.
